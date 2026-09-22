@@ -1,0 +1,291 @@
+{
+  "name": "Lead Intake",
+  "nodes": [
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list",
+          "cachedResultName": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "leads",
+          "mode": "list",
+          "cachedResultName": "leads"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "name": "={{ $json.body.name }}",
+            "email": "={{ $json.body.email }}",
+            "company": "={{ $json.body.company }}",
+            "message": "={{ $json.body.message }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "company",
+              "displayName": "company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "message",
+              "displayName": "message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "5568feb5-cd68-4d55-b8a5-94ee55921cbb",
+      "name": "Save Lead",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        16,
+        -16
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "lHek92kIinQsIHGB",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a16179c3-2116-44a0-ab55-b0d05edefc7d",
+      "name": "Webhook1",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -304,
+        -16
+      ],
+      "webhookId": "a1b2c3d4-0001-4000-8000-0000000000aa"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"status\": \"received\" }",
+        "options": {}
+      },
+      "id": "43bb0106-2eaa-423c-97f2-fab71efb79da",
+      "name": "Respond to Webhook1",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        896,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"openai/gpt-oss-20b\",\n  \"temperature\": 0.2,\n  \"response_format\": { \"type\": \"json_object\" },\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a B2B lead qualification assistant. Given a lead's details, respond ONLY with a JSON object with exactly these keys: score (integer 1-100, higher = more likely to convert), category (one of: hot, warm, cold), reason (one short sentence, under 20 words). No extra text.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Name: {{ $('Webhook1').item.json.body.name }}\\nCompany: {{ $('Webhook1').item.json.body.company || 'N/A' }}\\nMessage: {{ $('Webhook1').item.json.body.message }}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        272,
+        -16
+      ],
+      "id": "138cae02-de7a-4e45-80cf-4444f3f9f717",
+      "name": "Groq Qualify Lead",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Jr49ODDVwDqJJIEj",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.choices[0].message.content;\nconst parsed = JSON.parse(raw);\nreturn [{\n  json: {\n    id: $('Save Lead').first().json.id,\n    score: parsed.score,\n    category: parsed.category,\n    reason: parsed.reason\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        -16
+      ],
+      "id": "7d56a62e-ac02-4afa-95dc-7981b51f7ea8",
+      "name": "Parse AI Response"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE leads\nSET score = $1, category = $2, reason = $3\nWHERE id = $4;",
+        "options": {
+          "queryReplacement": "={{ [$json.score, $json.category, $json.reason, $json.id] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        672,
+        -16
+      ],
+      "id": "f4c2eb71-7857-4b92-90cc-2ad3d230c9ab",
+      "name": "Update Lead",
+      "credentials": {
+        "postgres": {
+          "id": "lHek92kIinQsIHGB",
+          "name": "Postgres account 2"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Save Lead": {
+      "main": [
+        [
+          {
+            "node": "Groq Qualify Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook1": {
+      "main": [
+        [
+          {
+            "node": "Save Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Qualify Lead": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Response": {
+      "main": [
+        [
+          {
+            "node": "Update Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Lead": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "e9c66139-e936-45cb-8ed9-df969222cbd4",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "9103808490d1f8dcfcdad0353050c08edcb8ff7e05047cf748ca3f42f40189b0"
+  },
+  "nodeGroups": [],
+  "id": "JJkf8CRznrghr6b7",
+  "tags": []
+}
