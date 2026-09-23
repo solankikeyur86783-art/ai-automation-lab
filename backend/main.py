@@ -1,34 +1,20 @@
 ﻿import os
 import re
 import uuid
-from typing import List
+from typing import List, Optional
 
 import httpx
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams, PointStruct
-from fastembed import TextEmbedding
+from qdrant_client.models import PointStruct
 
-QDRANT_HOST = os.getenv("QDRANT_HOST", "qdrant")
-QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
+from shared import qdrant, embedder, COLLECTION, ensure_collection
+from agent import lead_agent
+
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
-COLLECTION = "company_knowledge"
-VECTOR_SIZE = 384
 
 app = FastAPI(title="AI Company Knowledge Brain")
-qdrant = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
-embedder = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
-
-
-def ensure_collection():
-    existing = [c.name for c in qdrant.get_collections().collections]
-    if COLLECTION not in existing:
-        qdrant.create_collection(
-            collection_name=COLLECTION,
-            vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE),
-        )
 
 
 @app.on_event("startup")
@@ -59,6 +45,13 @@ class IngestRequest(BaseModel):
 class AskRequest(BaseModel):
     question: str
     top_k: int = 4
+
+
+class LeadInput(BaseModel):
+    name: str
+    email: str
+    company: Optional[str] = None
+    message: str
 
 
 @app.get("/health")
@@ -116,3 +109,18 @@ def ask(req: AskRequest):
     answer = resp.json()["choices"][0]["message"]["content"]
     sources = sorted(set(r.payload["source"] for r in results))
     return {"answer": answer, "sources": sources}
+
+
+@app.post("/agent/process-lead")
+def process_lead(req: LeadInput):
+    initial_state = {
+        "name": req.name,
+        "email": req.email,
+        "company": req.company or "N/A",
+        "message": req.message,
+        "used_knowledge_base": False,
+        "sources": [],
+        "suggested_reply": "",
+    }
+    result = lead_agent.invoke(initial_state)
+    return result

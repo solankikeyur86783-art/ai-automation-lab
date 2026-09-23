@@ -4,3 +4,4 @@ fastembed==0.4.2
 qdrant-client==1.12.1
 httpx==0.28.1
 pydantic==2.10.3
+langgraph==1.2.4
