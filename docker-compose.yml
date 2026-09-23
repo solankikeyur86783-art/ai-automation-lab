@@ -10,7 +10,6 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      # 5432 and 5433 are already used by other containers
       - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -30,6 +29,20 @@ services:
       - "6334:6334"
     volumes:
       - qdrant_data:/qdrant/storage
+
+  backend:
+    build: ./backend
+    container_name: ail-backend
+    restart: unless-stopped
+    depends_on:
+      - qdrant
+    environment:
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6333
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      GROQ_MODEL: openai/gpt-oss-20b
+    ports:
+      - "8001:8000"
 
   n8n:
     image: docker.n8n.io/n8nio/n8n:latest
