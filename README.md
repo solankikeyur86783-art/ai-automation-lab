@@ -106,6 +106,10 @@ docker compose up -d postgres qdrant backend
 - [ ] Portfolio site with "Talk to My Portfolio" assistant (reusing this RAG pipeline)
 - [ ] Production deployment
 
+## Screenshots
+
+### n8n Lead Intake Workflow
+![n8n workflow](docs/Screenshot 2026-09-25 091006.png  )
 ---
 
 Built by **Keyur Solanki** — n8n · Python · FastAPI · LangGraph · Qdrant · PostgreSQL
